@@ -10,9 +10,10 @@ public class OpenAIClient : IAIClient, IDisposable
     private const string DefaultModel = TokenizerModels.Gpt4o;
     private const double DefaultTemperature = 0.7;
     private readonly JsonSerializerOptions _jsonOptions;
-    private readonly HttpClient _httpClient;
+    private HttpClient? _httpClient;
     private readonly OpenAIClientConfig _defaultConfig;
     private readonly string _apiKey;
+    private bool _disposedValue;
 
     public OpenAIClient(HttpClient httpClient, AICredentials creds, OpenAIClientConfig? config = null)
     {
@@ -70,7 +71,7 @@ public class OpenAIClient : IAIClient, IDisposable
         {
             var json = JsonSerializer.Serialize(request, _jsonOptions);
             using var requestContent = new StringContent(json, Encoding.UTF8, "application/json");
-            using var response = await _httpClient.PostAsync("/v1/chat/completions", requestContent);
+            using var response = await _httpClient!.PostAsync("/v1/chat/completions", requestContent);
             if (!response.IsSuccessStatusCode)
             {
                 var errorMessage = await response.Content.ReadAsStringAsync();
@@ -117,11 +118,6 @@ public class OpenAIClient : IAIClient, IDisposable
             User = overrideConfig?.User ?? defaultConfig.User
         };
     }
-
-    public void Dispose()
-    {
-        _httpClient.Dispose();
-    }
     
     private record ChatCompletionRequest(
         string Model,
@@ -149,4 +145,23 @@ public class OpenAIClient : IAIClient, IDisposable
         bool? ParallelToolCalls,
         string? User
     );
+
+    protected virtual void Dispose(bool disposing)
+    {
+        if (!_disposedValue)
+        {
+            if (disposing)
+            {
+                //Don't dispose the HttpClient, it's managed by the caller
+                _httpClient = null;
+            }
+            _disposedValue = true;
+        }
+    }
+
+    public void Dispose()
+    {
+        Dispose(disposing: true);
+        GC.SuppressFinalize(this);
+    }
 }
