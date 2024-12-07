@@ -36,7 +36,19 @@ public class OpenAIClient : IAIClient, IDisposable
 
     private static OpenAIClientConfig CreateDefaultConfig() => new();
 
-    public async Task<Result<ChatCompletionResponse, string>> SendPromptAsync(
+    public async Task<Result<AIClientResponse, AIClientError>> SendAsync(
+        List<AIMessage> messages, OpenAIClientConfig? requestConfig = null)
+    {
+        var completionRes = await SendRawAsync(messages, requestConfig); 
+        if (completionRes.IsError)
+        {
+            return Result<AIClientResponse, AIClientError>.Fail(completionRes.UnwrapError());
+        }
+        var completion = completionRes.Unwrap();
+        return GetClientResponse(completion);
+    }
+
+    public async Task<Result<ChatCompletionResponse, AIClientError>> SendRawAsync(
         List<AIMessage> messages,
         OpenAIClientConfig? requestConfig = null)
     {
@@ -75,16 +87,53 @@ public class OpenAIClient : IAIClient, IDisposable
             if (!response.IsSuccessStatusCode)
             {
                 var errorMessage = await response.Content.ReadAsStringAsync();
-                return Result<ChatCompletionResponse, string>.Fail($"HTTP Error: {response.StatusCode}, Details: {errorMessage}");
+                return Result<ChatCompletionResponse, AIClientError>.Fail(new AIClientHttpError(response.StatusCode, errorMessage));
             }
             var chatResponse = await response.Content.ReadFromJsonAsync<ChatCompletionResponse>();
-            return Result<ChatCompletionResponse, string>.Ok(chatResponse);
+            return Result<ChatCompletionResponse, AIClientError>.Ok(chatResponse);
         }
         catch (Exception ex)
         {
-            // Return the exception message as a failure result
-            return Result<ChatCompletionResponse, string>.Fail($"Unexpected error: {ex.Message}");
+            return Result<ChatCompletionResponse, AIClientError>.Fail(new AIClientUnknownError(ex.ToString()));
         }
+    }
+
+    private static Result<AIClientResponse, AIClientError> GetClientResponse(ChatCompletionResponse completion)
+    {
+        var choices = new AIClientResponseChoice[completion.Choices.Count];
+        var i = 0;
+        foreach (var choice in completion.Choices)
+        {
+            if (choice.Message.Refusal != null)
+            {                
+                return Result<AIClientResponse, AIClientError>.Fail(new AIClientRefusalError(choice.Message.Refusal));
+            }
+            var chatMessage = choice.Message;
+            if (chatMessage.Content == null)
+            {
+                return Result<AIClientResponse, AIClientError>.Fail(new AIClientContentError("No content in message."));
+            }
+            var choiceMessage = new AIClientResponseMessage(
+                StringToRole(chatMessage.Role), 
+                chatMessage.Content
+            );
+
+            choices[i] = new AIClientResponseChoice(choice.Index, choiceMessage);
+            i++;
+        }
+        var response = new AIClientResponse(
+            completion.Model,
+            [.. choices],
+            completion.Usage.PromptTokens,
+            completion.Usage.CompletionTokens
+        );
+
+        return Result<AIClientResponse, AIClientError>.Ok(response);
+    }
+
+    private static AIMessageRole StringToRole(string role)
+    {
+        throw new NotImplementedException();
     }
 
     private static OpenAIClientConfig MergeConfigs(

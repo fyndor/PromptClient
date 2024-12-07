@@ -4,7 +4,7 @@ namespace PromptClient;
 
 public interface IAIClient
 {
-    Task<Result<ChatCompletionResponse, string>> SendPromptAsync(
+    Task<Result<AIClientResponse, AIClientError>> SendAsync(
         List<AIMessage> messages,
         OpenAIClientConfig? requestConfig = null);
 }
