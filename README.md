@@ -10,7 +10,7 @@ A .Net Core library for communicating with AI API services such as the OpenAI AP
     var apiKey = "YOUR_API_KEY_HERE";
     var creds = new AICredentials(apiKey);
     using var client = new OpenAIClient(httpClient, creds);
-    var response = await client.SendPromptAsync(
+    var response = await client.SendAsync(
         new List<AIMessage> {
             new AIMessage {
                 Content = "My LLM Prompt"
