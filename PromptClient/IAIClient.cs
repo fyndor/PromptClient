@@ -1,3 +1,4 @@
+using DevDotNetSdk.Models;
 using PromptClient.OpenAI;
 
 namespace PromptClient;
