@@ -134,7 +134,13 @@ public class OpenAIClient : IAIClient, IDisposable
 
     private static AIMessageRole StringToRole(string role)
     {
-        throw new NotImplementedException();
+        return role switch
+        {
+            "system" => AIMessageRole.System,
+            "user" => AIMessageRole.User,
+            "assistant" => AIMessageRole.Assistant,
+            _ => throw new Exception($"Unknown role: {role}")
+        };
     }
 
     private static OpenAIClientConfig MergeConfigs(
